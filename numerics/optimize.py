@@ -22,7 +22,9 @@ Since v2 the reference is READ from the single trusted source
 (three-source verified: Wikipedia, Wales-Ulker CCD, Deeter, plus an independent local
 recompute; see that file's meta block). If that file is not reachable (standalone clone),
 the documented fallback constant REF_ENERGY_FALLBACK -- the same number, same source -- is
-used and a note is printed.
+used and a note is printed. Run `python3 optimize.py --selftest` for the negative control:
+it walks the exact acceptance() path below with a deliberately wrong reference (true value
++/- 0.5), requires the rejection to trigger, and prints PASS (exit 0) only if it does.
 
 ERRATUM (recorded in README.md and PROGRESS.md): the original task brief pinned
 39.783856229 as the reference energy. That number is below the true global minimum and is
@@ -37,7 +39,8 @@ instead, on the strength of three independent confirmations obtained in this run
     coordinate file (xyz/11.xyz) evaluates to 40.596475 at its 8-decimal precision with the
     same pairwise-inner-product multiset as the configuration found here.
 
-Usage: python3 optimize.py [output.json]
+Usage: python3 optimize.py [output.json]      real mode (default; runs the optimisation)
+       python3 optimize.py --selftest         negative control for the acceptance gate only
 """
 from __future__ import annotations
 
@@ -80,6 +83,19 @@ def load_reference_energy() -> float:
               f"{REF_ENERGY_FALLBACK} (update REF_ENERGY_FALLBACK deliberately!); "
               f"trusting energies.json")
     return value
+
+
+def acceptance(E: float, ref: float, tol: float = TOL) -> int:
+    """The acceptance gate, shared by main() (real mode) and selftest() (negative control):
+    prints the comparison and returns the exit code -- 0 iff |E - ref| < tol."""
+    gap = abs(E - ref)
+    print(f"|E_best - {ref}| = {gap:.3e} (tolerance {tol:.0e})")
+    if not gap < tol:
+        print(f"FAILED: best energy {E!r} does not reproduce the reference {ref} "
+              f"to within {tol}")
+        return 1
+    print(f"OK: reproduced the reference energy to within {tol:.0e}")
+    return 0
 
 
 def project(u: np.ndarray) -> np.ndarray:
@@ -240,13 +256,63 @@ def main() -> int:
     out.write_text(doc, encoding="utf-8")
     print(f"wrote {out}")
 
-    if not gap < TOL:
-        print(f"FAILED: best energy {E_best!r} does not reproduce the reference {ref} "
-              f"to within {TOL}")
+    return acceptance(E_best, ref)
+
+
+def selftest() -> int:
+    """Negative control for the acceptance gate (v2): prove the gate has teeth.
+
+    Walks the exact acceptance() path used by main() with a deliberately WRONG reference
+    energy (true value + 0.5 and - 0.5); the rejection (exit 1) MUST trigger for both.
+    Then a positive control: the true reference must be accepted. Exit 0 with PASS iff
+    all three behave; exit 1 (SELFTEST FAILED) otherwise. No optimisation is run -- the
+    gate logic, not the optimiser, is what is under test here.
+
+    The energy value fed to the gate is the real one whenever available: the artifact
+    written by the last real run (reference_config.json), recomputed from its coordinates
+    and checked against its stored energy; failing that, the reference value itself.
+    """
+    ref = load_reference_energy()
+    cfg_path = Path(__file__).resolve().parent / "reference_config.json"
+    try:
+        cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+        E_stored = float(cfg["energy"])
+        E_recomputed = coulomb_energy(np.asarray(cfg["coordinates"], dtype=float))
+        if abs(E_recomputed - E_stored) >= 1e-9:
+            raise ValueError(f"stored energy {E_stored!r} != recomputed {E_recomputed!r}")
+        E_test = E_stored
+        src = (f"recomputed from {cfg_path.name} "
+               f"(recomputed - stored = {E_recomputed - E_stored:+.1e})")
+    except (OSError, KeyError, ValueError) as exc:
+        E_test = ref
+        src = f"the reference itself ({exc.__class__.__name__}; run the real mode first)"
+    print(f"selftest: E_test = {E_test:.17g} -- {src}")
+    print(f"selftest: true reference = {ref!r}; deliberately wrong references "
+          f"{ref + 0.5!r} and {ref - 0.5!r}")
+
+    ok = True
+    for wrong in (ref + 0.5, ref - 0.5):
+        rc = acceptance(E_test, wrong)
+        if rc == 1:
+            print(f"negative control: wrong reference {wrong!r} correctly REJECTED")
+        else:
+            ok = False
+            print(f"negative control FAILURE: wrong reference {wrong!r} was ACCEPTED "
+                  f"(exit {rc})")
+    if acceptance(E_test, ref) == 0:
+        print("positive control: the true reference is accepted")
+    else:
+        ok = False
+        print("positive control FAILURE: the true reference was REJECTED")
+    if not ok:
+        print("SELFTEST FAILED: the acceptance gate does not discriminate")
         return 1
-    print(f"OK: reproduced the reference energy to within {TOL}")
+    print("PASS: the acceptance gate rejects wrong references (true value +/- 0.5) "
+          "and accepts the real run")
     return 0
 
 
 if __name__ == "__main__":
+    if "--selftest" in sys.argv[1:]:
+        sys.exit(selftest())
     sys.exit(main())
