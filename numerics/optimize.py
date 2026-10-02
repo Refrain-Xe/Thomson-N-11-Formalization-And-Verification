@@ -17,6 +17,12 @@ Method (deterministic, seeded):
 Acceptance: the best energy must reproduce the reference value
     E_1(11) = 40.596450508...
 to within 1e-5; otherwise this script exits 1 (the workflow treats the exit code as a gate).
+Since v2 the reference is READ from the single trusted source
+    ../thomson-workflow/data/energies.json   (entry energies["11"], field "value")
+(three-source verified: Wikipedia, Wales-Ulker CCD, Deeter, plus an independent local
+recompute; see that file's meta block). If that file is not reachable (standalone clone),
+the documented fallback constant REF_ENERGY_FALLBACK -- the same number, same source -- is
+used and a note is printed.
 
 ERRATUM (recorded in README.md and PROGRESS.md): the original task brief pinned
 39.783856229 as the reference energy. That number is below the true global minimum and is
@@ -48,8 +54,32 @@ from energy import coulomb_energy  # noqa: E402
 N = 11
 N_STARTS = 60          # >= 40 random starts, as required by the project brief
 SEED = 20261002
-REF_ENERGY = 40.596450508   # erratum-pinned reference, see module docstring and README.md
 TOL = 1e-5
+
+# Reference energy: the single trusted source is the workflow's three-source-verified data
+# file (thomson-workflow/data/energies.json, entry energies["11"].value = 40.596450508,
+# status "erratum" = the corrected value superseding the brief's wrong 39.783856229).
+# REF_ENERGY_FALLBACK documents the same number for standalone clones of this repo; the
+# loader below prints a note whenever it has to be used, and whenever the file's value
+# disagrees with it, so a silent divergence is impossible.
+ENERGIES_JSON = Path(__file__).resolve().parents[2] / "thomson-workflow" / "data" / "energies.json"
+REF_ENERGY_FALLBACK = 40.596450508   # = energies.json energies["11"]["value"]
+
+
+def load_reference_energy() -> float:
+    """The N = 11 reference energy, read from ENERGIES_JSON when reachable."""
+    try:
+        entry = json.loads(ENERGIES_JSON.read_text(encoding="utf-8"))["energies"]["11"]
+        value = float(entry["value"])
+    except (OSError, KeyError, ValueError) as exc:
+        print(f"note: {ENERGIES_JSON} not readable ({exc.__class__.__name__}: {exc}); "
+              f"using the documented fallback constant {REF_ENERGY_FALLBACK}")
+        return REF_ENERGY_FALLBACK
+    if abs(value - REF_ENERGY_FALLBACK) > 1e-9:
+        print(f"note: energies.json value {value!r} differs from the documented fallback "
+              f"{REF_ENERGY_FALLBACK} (update REF_ENERGY_FALLBACK deliberately!); "
+              f"trusting energies.json")
+    return value
 
 
 def project(u: np.ndarray) -> np.ndarray:
@@ -127,6 +157,7 @@ def final_polish(X: np.ndarray, rounds: int = 12) -> np.ndarray:
 
 
 def main() -> int:
+    ref = load_reference_energy()
     rng = np.random.default_rng(SEED)
     results = []   # (energy, X)
     print(f"N = {N} points on S^2, {N_STARTS} seeded random starts (seed = {SEED})")
@@ -183,8 +214,8 @@ def main() -> int:
     assert abs(coulomb_energy(X_out) - E_best) < 1e-12, "framing changed the energy"
     assert float(np.abs(np.linalg.norm(X_out, axis=1) - 1).max()) < 1e-12
 
-    gap = abs(E_best - REF_ENERGY)
-    print(f"|E_best - {REF_ENERGY}| = {gap:.3e} (tolerance {TOL:.0e})")
+    gap = abs(E_best - ref)
+    print(f"reference energy: {ref!r} (source: {ENERGIES_JSON}, energies[\"11\"].value)")
 
     out = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent / "reference_config.json"
 
@@ -195,7 +226,7 @@ def main() -> int:
         "{\n"
         '  "n": 11,\n'
         f'  "energy": {g17(E_best)},\n'
-        '  "reference_energy": 40.596450508,\n'
+        '  "reference_energy": ' + repr(ref) + ',\n'
         f'  "abs_gap": {g17(gap)},\n'
         '  "coordinates": [\n'
         + ",\n".join(
@@ -210,7 +241,7 @@ def main() -> int:
     print(f"wrote {out}")
 
     if not gap < TOL:
-        print(f"FAILED: best energy {E_best!r} does not reproduce the reference {REF_ENERGY} "
+        print(f"FAILED: best energy {E_best!r} does not reproduce the reference {ref} "
               f"to within {TOL}")
         return 1
     print(f"OK: reproduced the reference energy to within {TOL}")
