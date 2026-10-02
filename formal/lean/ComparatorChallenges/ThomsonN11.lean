@@ -6,8 +6,10 @@ import Mathlib
 Minimise the Coulomb energy `E(x) = ∑_{i<j} 1 / ‖x i - x j‖` over configurations of `N` pairwise
 distinct points on the unit sphere `S² ⊂ ℝ³`, for `N = 11`.
 
-* The (numerically known) minimum is `E₁(11) ≈ 39.783856229`; the conjectured minimiser and its
-  provenance are described in `README.md` and `notes/strategy.md`.
+* The (numerically known) minimum is `E₁(11) ≈ 40.596450508` (erratum: the project brief's
+  original figure `39.783856229` was wrong — it lies below the true minimum; see `README.md`
+  section 2 and `PROGRESS.md` section 3); the conjectured minimiser (C2v, edge-contracted
+  icosahedron) and its provenance are described in `README.md` and `notes/strategy.md`.
 * `N = 11` has no known simple one-parameter closed-form family, so unlike the `N = 7` challenge
   this file fixes NO candidate configuration. It only carries the base definitions and the two
   rational milestone lower bounds. The shape of the final theorem (the minimiser implicitly
@@ -66,10 +68,10 @@ lemma norm_sq_cyl (ρ θ h : ℝ) : ‖cyl ρ θ h‖ ^ 2 = ρ ^ 2 + h ^ 2 := by
 
 The two milestones below are rational lower bounds for the Coulomb energy of any 11-point
 configuration on the unit sphere. `M0` is a first weak bound that any serious method (even a
-two-point / Yudin-style bound) should clear; `M1` is within `1.034` of the conjectured optimum
-`≈ 39.783856229`, and is calibrated to be reachable by the planned three-point semidefinite
-method (see `notes/strategy.md`). Both are milestones on the way to the eventual theorem
-`E₁(11) = 39.783856229…` with its equality case; that theorem is not stated here yet. -/
+two-point / Yudin-style bound) should clear; `M1` is within `1.85` of the numerically known
+optimum `≈ 40.596450508`, and is calibrated to be reachable by the planned three-point
+semidefinite method (see `notes/strategy.md`). Both are milestones on the way to the eventual
+theorem `E₁(11) = 40.596450508…` with its equality case; that theorem is not stated here yet. -/
 
 /-- **Milestone M0 (Thomson, N = 11).** Every configuration of 11 distinct points on the unit
 sphere has Coulomb energy at least `55 / 2 = 27.5`. -/
