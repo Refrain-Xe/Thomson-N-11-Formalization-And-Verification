@@ -1,0 +1,21 @@
+name = "ThomsonN11"
+defaultTargets = ["ThomsonN11"]
+
+# Mathlib is the only dependency, pinned to the same revision as the N = 7 proof package
+# (references/thomson-n7-lean). Its own manifest fixes the versions of aesop, batteries, Qq, ...;
+# lake-manifest.json records the resolved revisions. Do NOT run `lake update`.
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+git = "https://github.com/leanprover-community/mathlib4.git"
+rev = "d13f23b723b8a846827a245b89c10fc7d3f11612"
+
+# The future proof: ThomsonN11.lean imports ThomsonN11/Solution.lean.
+[[lean_lib]]
+name = "ThomsonN11"
+
+# The fixed statement file (two `sorry`s by design: the milestones M0 and M1),
+# to be compared with the proof once it exists (see scripts/check.sh).
+[[lean_lib]]
+name = "ComparatorChallenges"
+roots = ["ComparatorChallenges.ThomsonN11"]

@@ -1,0 +1,146 @@
+# PROGRESS（工作日志）
+
+本文件由各次运行依次追加。当前记录：**奠基运行，2026-10-02**。
+
+## 1. 本次做了什么
+
+### 1.1 仓库骨架
+
+- 建立本仓库目录结构（见 `README.md` 第 5 节）。
+- `formal/lean/`：`lake-manifest.json`、`lean-toolchain`、`.gitignore` 从
+  `references/thomson-n7-lean/formal/lean/` **原样拷贝**（未运行 `lake update`）；
+  `lakefile.toml` 按任务书改包名 `ThomsonN11`，Mathlib 钉同一 rev `d13f23b723b8a846827a245b89c10fc7d3f11612`。
+  ⚠️ 注意：原样拷贝来的 `lake-manifest.json` 末尾 `"name": "ThomsonN7"` 是参考仓库的根包名，
+  与本包名不一致；是否需要连同改成 `ThomsonN11` 待首次 `lake build` 时验证（见第 4 节遗留问题）。
+- `formal/lean/ComparatorChallenges/ThomsonN11.lean`：基础定义 `R3`/`SphereConfig`/
+  `coulombEnergy`/`cyl` 及两条辅助引理 `norm_sq_cyl_sub`/`norm_sq_cyl` 从参考仓库挑战文件
+  **逐字搬运**（用脚本逐块核对与原文一致），仅命名空间与文件头不同；里程碑命题
+  `thomson_eleven_M0`（E ≥ 55/2）与 `thomson_eleven_M1`（E ≥ 155/4）以 `sorry` 结尾。
+  N = 11 无简单单参数闭式族，故挑战文件**不放**候选构型定义；最终命题的隐式刻画形态写在
+  `notes/strategy.md`，不进 Lean（任务书明确要求）。
+- `formal/lean/ThomsonN11.lean`（根模块，`import ThomsonN11.Solution`）与
+  `formal/lean/ThomsonN11/Solution.lean`（占位：`import Mathlib` + 未来证明结构说明）。
+- `formal/lean/scripts/`：`check.sh`（哈希步在 `SHA256SUMS.txt` 未钉时允许跳过；前言一致性检查
+  在 Solution 为占位时挂起；claims.tsv 索引步删除——还没有论文）、`DumpBody.lean`（原样）、
+  `compare_statements.py`（SKIP 集合清空：M0/M1 都是要被证的）、`CheckAxioms.lean`、
+  `negative-control.sh`（篡改 M1 不等号须被抓）、`pin_hashes.sh`（参考仓库没有此脚本，
+  按其 `SHA256SUMS.txt` 的格式新写，用于把包文件哈希钉进 `SHA256SUMS.txt`）。
+
+### 1.2 数值复现与勘误（本次最重要的发现）
+
+任务书要求 `optimize.py` 断言 `|E_best − 39.783856229| < 1e-5`。实施过程中发现**该参考值
+错误**，完整证据链与升级裁定记录在第 3 节。结论：`E₁(11) = 40.596450508…`，
+`optimize.py` 与 `README.md` 改钉 `REF_ENERGY = 40.596450508`（容差 1e-5 不变）。
+
+`numerics/energy.py`：`coulomb_energy(X)`，n×3 坐标 → Σ_{i<j} 1/‖xi−xj‖。
+验证（命令与输出，本机 python3 3.13.13 / numpy 2.4.6 / scipy 1.17.1）：
+
+    五角双锥 (N=7)   → 14.452977414221344   （文献/参考仓库：14.452977414…）
+    方反棱柱 (N=8)   → 19.67528786123276    （KLT 论文：19.6752878612）
+    二十面体 (N=12)  → 49.16525305762881    （Wikipedia：49.165253058）
+
+`numerics/optimize.py`：60 个固定种子随机起点，每起点 L-BFGS-B（球面径向投影参数化 + 解析梯度，
+梯度对有限差分校验通过，相对误差 1.9e-9）+ SLSQP 约束抛光；最优者再经 12 轮穷尽 L-BFGS 抛光。
+
+    $ python3 thomson-n11/numerics/optimize.py ; echo EXIT=$?
+    N = 11 points on S^2, 60 seeded random starts (seed = 20261002)
+      after  60 starts: best E = 40.596450508191, this start E = 40.596450508
+    distinct local minima within 1e-7: 1
+        E = 40.596450508191   reached by 60 start(s)
+    global best: E = 40.596450508190578
+    stationarity: max|tangential gradient| = 2.10e-10, max|row norm - 1| = 1.11e-16
+    |E_best - 40.596450508| = 1.906e-10 (tolerance 1e-05)
+    wrote .../numerics/reference_config.json
+    OK: reproduced the reference energy to within 1e-05
+    EXIT=0
+
+确定性：连续两次运行输出的 `reference_config.json` 字节一致，
+sha256 = 90ae9afd2acf6893613309e737a266e28031e669dc769baf8125e475a838be53。
+该文件是再生成产物，已列入仓库根 `.gitignore`（保证验收门 2「工作树干净」对不同环境稳健）。
+
+### 1.3 最优构型结构（全部为本次数值验证，非文献转录）
+
+- **对称性 C2v**：协方差阵 `XᵀX` 最小特征值（3.554503）对应的主轴是一个二重旋转轴
+  （x ↦ 2(a·x)a − x 把构型映到自身，11/11 点在 1e-6 内匹配）；含该轴的两张镜面同样 11/11 匹配。
+- **轨道分解** 11 = 1 + 2 + 2 + 2 + 4。
+- **55 个点对、20 个不同内积值**，多重集（数值，聚类容差 1e-6）：
+
+      -0.999022793×2  -0.943310023×2  -0.805954897×2  -0.642378985×4  -0.552681463×2
+      -0.500513593×4  -0.468917100×1  -0.465219789×2  -0.415314314×4  -0.389086401×1
+      -0.332252270×4  +0.168359699×4  +0.299126591×1  +0.314415020×4  +0.370998333×4
+      +0.429421384×2  +0.445436331×4  +0.505766180×4  +0.515307141×2  +0.521909766×2
+
+- **结构来源**：二十面体收缩一条棱（相邻两顶点并为归一化中点）未弛豫能量 40.79434661663611，
+  弛豫后精确到 40.59645050819061 = 全局最小。「去掉一个顶点的二十面体」（C5v 的 5+5+1 环族，
+  双参数扫描 + Nelder-Mead，300 起点）最优仅 40.615117337——是另一个局部极小，不是全局；
+  5+6 双环族最优 41.044302330。
+- 最小点间距 0.977844807…。
+
+## 2. 验收结果（工作流三验收门，按原命令逐字执行）
+
+| 门 | 命令 | 结果 |
+| --- | --- | --- |
+| 1 | `python3 thomson-n11/numerics/optimize.py` | ✅ 退出码 0（输出见 1.2；|gap| = 1.9e-10 < 1e-5） |
+| 2 | `git -C thomson-n11 status --porcelain` | ✅ 输出为空（提交后验证，见 1.2 关于 reference_config.json 的处理） |
+| 3 | `thomson-n11/formal/lean/ComparatorChallenges/*.lean` 存在 | ✅ `ComparatorChallenges/ThomsonN11.lean` 存在 |
+
+**没有跑过的检查（如实记录）**：
+
+- `lake build` / `formal/lean/scripts/check.sh` 的构建部分 / `CheckAxioms.lean` /
+  `negative-control.sh`：**未运行**。本机装了 elan（`~/.elan/bin`）但没有任何工具链
+  （`elan toolchain list` → "no installed toolchains"），且 Mathlib 缓存不可得，本次未安装下载。
+  因此 `ComparatorChallenges/ThomsonN11.lean` **未经编译验证**；其风险由「全部可执行内容逐字
+  取自参考仓库中已编译通过的文件（逐块脚本核对）+ 里程碑命题语句与参考文件中同形命题结构一致」
+  缓解，但不能视为已验证。
+- 已跑过的无构建检查（记录）：
+  - `SKIP_BUILD=1 bash scripts/check.sh`（在 `formal/lean/` 下）→ 步骤 1 按设计跳过
+    （未钉哈希）、步骤 2 按设计挂起（Solution 为占位）、步骤 3 token 扫描无输出，退出码 0；
+  - `bash scripts/pin_hashes.sh` 写出 `SHA256SUMS.txt`（格式与参考仓库一致，且其中
+    `.gitignore` 一行哈希 `ccaa0df3…` 与参考仓库的 `.gitignore` 哈希相同——原样拷贝的旁证），
+    `--check` 全部 ok；随后按设计删除该文件（哈希留待挑战语句定稿后再钉）；
+  - `bash -n` 校验三个 shell 脚本、`python3 -m py_compile` 校验两个 numerics 脚本与
+    `compare_statements.py`，均通过。
+- Lean Comparator / 第二内核（nanoda）：参考仓库有，本仓库按任务书未要求，未配置。
+
+## 3. 勘误：任务书参考能量 39.783856229 → 40.596450508
+
+发现过程：`optimize.py` 初版按任务书钉 39.783856229 时，60 个随机起点全部收敛到
+E = 40.596450508191，无一达到断言值。排查步骤（全部有运行记录）：
+
+1. **能量函数正确性**：N=7 → 14.452977414221344、N=8 → 19.67528786123276、
+   N=12 → 49.16525305762881，与文献一致（见 1.2）。
+2. **优化器正确性**：同一多起点方法复现 N=7 → 14.452977414、N=9 → 25.759986531、
+   N=10 → 32.716949460、N=12 → 49.165253058（与文献差 ≤ 1.3e-10）。
+3. **穷尽搜索 N=11**：L-BFGS-B（投影参数化）与 SLSQP（原生约束）两个独立优化器、60 随机起点、
+   从 N=9/N=10 最优构型生长的 100 次插入、basin-hopping 300 步、结构族扫描（C5v 5+5+1 环、
+   5+6 双环、二十面体去顶/缩棱）——最低能量始终是 40.596450508…，其切向梯度可压到 1e-10，
+   沿随机切向微扰能量双向上升（真局部极小）。
+4. **文献三角验证**（本次在线抓取）：
+   - Wikipedia《Thomson problem》表：N=11 → 40.596450510，C2v，"edge-contracted icosahedron"
+     （其 N=7/8/9/10/12 各行与本机计算一致）；
+   - Wales–Ulker Cambridge Cluster Database（`table.html`）：N=11 → 40.5964505；
+     其 `xyz/11.xyz` 坐标按本仓库 `coulomb_energy` 复算 = 40.596475（文件仅 8 位小数、
+     行范数 0.999–1.001，解释 2.5e-5 差距），且与本次找到的构型内积多重集一致；
+   - UBC 讲义 PDF 列 11 charges → 40.596450。
+   - 数值 39.783856229 在任何 Thomson 表中都检索不到原文命中。
+5. **升级裁定**：已通过升级渠道请示运行所有者，裁定采用方案 A：`optimize.py` 与 `README.md`
+   改钉 `REF_ENERGY = 40.596450508`（容差 1e-5），写勘误说明（本节），Lean 挑战命题不动
+   （M0 = 27.5、M1 = 38.75 均低于真实最小值 40.5964505，作为下界里程碑依然成立）。
+
+## 4. 遗留问题（后续运行接着做）
+
+1. **Lean 侧全部未验证**：安装 `leanprover/lean4:v4.34.1` 工具链 + Mathlib 缓存后，跑
+   `SKIP_BUILD=1 bash formal/lean/scripts/check.sh` 先做无构建检查，再
+   `bash formal/lean/scripts/check.sh` 全量（预期：挑战文件恰 2 个 `sorry` 警告；
+   Solution 占位无警告；随后再证 M0/M1）。首次构建时同时验证 1.1 末尾提到的
+   `lake-manifest.json` 根包名问题（如 Lake 报 name mismatch，把其 `"name"` 字段改为
+   `"ThomsonN11"` 即可——这只影响根包名，不动任何依赖 rev）。
+2. `scripts/pin_hashes.sh` 尚未运行，`SHA256SUMS.txt` 未钉（check.sh 当前按设计跳过哈希步）。
+   挑战文件语句定稿后应钉一次。
+3. 最终定理的 Lean 形态（隐式刻画 + 唯一性）未定稿：见 `notes/strategy.md` 第 5 节的
+   两个候选写法，待 SDP 上界路线走通后定。
+4. `optimize.py` 的起点数（60）对 N=11 的复杂地形是够的（60/60 同收敛），但若未来改种子，
+   注意 N=11 的地形陷阱：文献值一度被任务书录错，且「去顶二十面体」是诱饵局部极小
+   （40.615117337，仅比全局高 0.019）。
+5. 数值侧下一步（若走严格区间路线）：用区间算术把最优构型的能量/梯度包住，
+   产出机器可查证书（KLT 式），支撑 SDP 分裂的参数选择。
