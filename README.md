@@ -58,11 +58,15 @@ C2v 对称的「边收缩二十面体」）。唯一性的严格表述以及最�
 **第一阶段（严格数值，本阶段已通过）**
 
 1. `python3 thomson-n11/numerics/optimize.py` 退出码为 0：≥ 40 个随机起点的 scipy 多起点优化
-   找到的最优能量必须满足 `|E_best − 40.596450508| < 1e-5`，并把最优坐标以 17 位有效数字写入
-   `numerics/reference_config.json`（该文件是确定性再生成产物，已列入 `.gitignore`，
+   找到的最优能量必须满足 `|E_best − 参考能量| < 1e-5`；参考能量 v2 起改为**读**
+   `../thomson-workflow/data/energies.json` 的 `energies["11"].value`（三源校验唯一可信来源，
+   = 40.596450508；不可达时用同值文档化回退常量并打印 notice），并把最优坐标以 17 位有效数字
+   写入 `numerics/reference_config.json`（该文件是确定性再生成产物，已列入 `.gitignore`，
    两次运行字节一致，sha256 记录在 `PROGRESS.md`）；
-2. `git -C thomson-n11 status --porcelain` 输出为空（工作树干净）；
-3. `thomson-n11/formal/lean/ComparatorChallenges/*.lean` 存在。
+2. `python3 thomson-n11/numerics/optimize.py --selftest` 退出码为 0（v2 新增负控制：用真值
+   ± 0.5 的故意错参考走同一断言路径，拒绝必须触发，打印 PASS——证明门 1 对错值真的会拒绝）；
+3. `git -C thomson-n11 status --porcelain` 输出为空（工作树干净）；
+4. `thomson-n11/formal/lean/ComparatorChallenges/*.lean` 存在。
 
 **第二阶段（Lean，后续运行）**
 
@@ -79,10 +83,11 @@ C2v 对称的「边收缩二十面体」）。唯一性的严格表述以及最�
 
 | 事项 | 状态 |
 | --- | --- |
-| 仓库骨架（README/PROGRESS/notes/formal/numerics/scripts） | ✅ 本次完成 |
-| 数值复现 E₁(11) = 40.596450508（含勘误裁定） | ✅ 本次完成，验收门 1 通过 |
-| Lean 挑战命题（基础定义 + M0/M1，全 `sorry`） | ✅ 本次完成（未编译，见下） |
-| Lean 包构建 / `check.sh` / 负控制 | ⏸ 未运行：本机无 Lean 工具链（`elan toolchain list` 为空），留给后续运行 |
+| 仓库骨架（README/PROGRESS/notes/formal/numerics/scripts） | ✅ 奠基运行完成 |
+| 数值复现 E₁(11) = 40.596450508（含勘误裁定） | ✅ 奠基运行完成，验收门 1 通过 |
+| v2 升级：参考能量读 energies.json + `--selftest` 负控制 + `check.sh` 全判定 | ✅ 2026-10-02 完成（见 `PROGRESS.md` 第 6 节） |
+| Lean 挑战命题（基础定义 + M0/M1，全 `sorry`） | ✅ 奠基运行完成（未编译，见下） |
+| Lean 包构建 / `check.sh` 构建段 / 负控制 | ⏸ 未运行：本机无 Lean 工具链，留给后续运行（v2 已用桩 `lake` 验证判定逻辑并逐项实测失败路径） |
 | M0 / M1 / 最终定理的证明 | ⏬ 未开始（见 `notes/strategy.md`） |
 
 ## 5. 仓库结构

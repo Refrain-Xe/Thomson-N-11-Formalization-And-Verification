@@ -1,6 +1,7 @@
 # PROGRESS（工作日志）
 
-本文件由各次运行依次追加。当前记录：**奠基运行，2026-10-02**。
+本文件由各次运行依次追加。当前记录：**奠基运行，2026-10-02**（第 1–5 节）；
+**升级运行 v2，2026-10-02**（第 6 节：负控制与验收门加固）。
 
 ## 1. 本次做了什么
 
@@ -165,3 +166,68 @@ E = 40.596450508191，无一达到断言值。排查步骤（全部有运行记�
 README/PROGRESS/optimize.py 的勘误记录。复审方独立数值复算（另一 SLSQP 实现、种子 777、
 60 随机 + 7 结构化起点）同样得全局 40.596450508191、次低极小 40.615117336946，与第 3 节
 证据一致。三个验收门在修复后重跑通过（见第 2 节表格，命令不变）。
+
+## 6. 升级运行（2026-10-02，v2：负控制与验收门加固）
+
+本节由 v2 升级运行追加。动机直接来自 v1 的两条教训：**(a)** 任务书参考能量曾经录错
+（39.783856229，第 3 节），当时的验收断言只靠「跑出来看输出」发现不一致——一个**没有牙齿的
+验收门**（比较逻辑写错、永远放行）会把错误参考值也放过去；**(b)** v1 的 `check.sh` 若干检查
+只打印不判定（token 扫描、sorry 计数），与 N = 7 蓝本一样「打印即通过」。本次升级把两处
+都装上负控制。
+
+### 6.1 参考能量改为读唯一可信来源（commit `622c096`）
+
+`numerics/optimize.py` 不再硬编码 `REF_ENERGY`，改为 `load_reference_energy()` 读
+`../thomson-workflow/data/energies.json` 的 `energies["11"].value`（三源校验数据文件：
+Wikipedia / Wales–Ulker CCD / Deeter + 独立本机复算，见其 meta 块）。原常量保留为
+`REF_ENERGY_FALLBACK = 40.596450508`（同一数字、同一来源），仅在数据文件不可达（如本仓库被
+单独 clone）时使用，且**两种情况都打印 notice**（使用回退常量、或文件值与回退常量分歧
+> 1e-9），静默分歧不可能。本次读取值与 v1 常量逐位一致（40.596450508），无冲突。
+
+### 6.2 `--selftest` 负控制（commit `f9e28b1`）
+
+断言逻辑抽出为 `acceptance(E, ref, tol)`（真实模式与自测共用同一条路径）；`--selftest`
+用**故意错的参考能量（真值 ± 0.5）**各走一遍该路径，要求两者都必须触发拒绝（exit 1，打印
+FAILED），再加正控制（真参考必须放行）。全部符合才打印 `PASS` 并以退出码 0 结束；任一不符
+打印 `SELFTEST FAILED` 退出 1。喂给门的能量是真值优先：从上次真实运行产物
+`reference_config.json` 重算坐标能量并与存储值核对（差 +1.4e-14）后才使用；文件缺失时回退用
+参考值本身（输出中注明）。不重跑优化——受试的是门逻辑，不是优化器。真实模式除共用
+`acceptance()` 外行为不变（实测退出码 0、产物字节不变）。
+
+### 6.3 `check.sh` 加固（commit `c34a812`）
+
+- 前言一致性：显式 `PREAMBLE MISMATCH` + exit 1（原先靠 `set -e` 静默退出）；
+- token 扫描：解法文件出现任何违禁 token 即 FATAL（原先只打印，从不判定；扫描正则未动）；
+- 新增步骤 3b 仓库卫生：git 跟踪了 `__pycache__`/`*.pyc` 即 FATAL。核实：本仓库 `.gitignore`
+  自奠基起已含 `__pycache__/`（`git check-ignore -v` 确认生效），且 `git ls-files` 无任何
+  字节码被跟踪，故升级要求的 `git rm -r --cached` 清理为**无操作**（nothing to clean），
+  3b 使其保持如此；
+- 构建步：去掉 `TIME_PRE` bash 数组前缀（macOS 自带 bash 3.2 下空数组展开 + `set -u` 是潜在
+  「unbound variable」炸弹）；显式检查构建退出码；sorry 计数加判定——**源级计数为约束**
+  （挑战文件独立 `sorry` 行恰 2、解法 0，与缓存重建无关），构建日志级计数兼容「缓存构建不重发
+  警告」的情形（挑战文件警告出现时必须恰 2，解法警告必须 0）；
+- 步骤 6–7：失败时点名日志文件再退出。
+
+**失败路径逐项实测**（临时副本中每次只篡改一个因子，全部 exit 1 且打出对应判定行）：解法含
+`sorry` → FORBIDDEN TOKEN；钉错哈希 → HASH MISMATCH；前言改一词 → PREAMBLE MISMATCH；
+临时 git 仓库跟踪 pycache → TRACKED BYTECODE；桩 `lake` 退出 1 → LAKE BUILD FAILED；挑战
+警告数 1 / 解法警告数 1 → SORRY-WARNING CHECK FAILED；挑战源码 3 个 `sorry` 行 →
+SORRY-COUNT CHECK FAILED；新鲜构建（2 警告）与全缓存构建（0 警告）均通过步骤 5。正控制
+（未篡改的真实树，`SKIP_BUILD=1 bash scripts/check.sh`）退出码 0。
+
+### 6.4 没有跑过的检查（如实记录）
+
+- **Lean 构建仍未运行**：本机无 elan/lake/lean（`which elan lake lean` 均无；v1 记录的工具链
+  缺失依旧），`check.sh` 步骤 4–7 的 Lean 侧（真实 `lake build`、公理检查、语句比对、
+  `negative-control.sh`）未执行；6.3 的桩测试只验证**判定逻辑**，不验证 Lean 本身。与 v1
+  第 2/4 节一致，留给装好工具链的后续运行。
+- `bash -n` 校验加固后的 `check.sh` 通过；`python3 -m py_compile` 校验改后的
+  `optimize.py` 通过。
+
+### 6.5 v2 验收门（工作流命令逐字执行）
+
+| 门 | 命令 | 结果 |
+| --- | --- | --- |
+| 1 | `python3 thomson-n11/numerics/optimize.py` | ✅ 退出码 0（E_best = 40.596450508190578，\|gap\| = 1.906e-10；reference_config.json sha256 仍为 90ae9afd…，与 1.2 记录一致） |
+| 2 | `python3 thomson-n11/numerics/optimize.py --selftest` | ✅ 退出码 0，打印 PASS（±0.5 两个错参考均被拒，正控制通过） |
+| 3 | `git -C thomson-n11 status --porcelain` | ✅ 输出为空 |
