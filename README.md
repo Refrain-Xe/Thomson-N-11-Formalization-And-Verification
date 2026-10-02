@@ -70,8 +70,11 @@ C2v 对称的「边收缩二十面体」）。唯一性的严格表述以及最�
 
 **第二阶段（Lean，后续运行）**
 
-1. 安装 Lean 工具链（`lean-toolchain` 钉 `leanprover/lean4:v4.34.1`，Mathlib 钉
-   `d13f23b723b8a846827a245b89c10fc7d3f11612`，与参考仓库 N = 7 工程同款；**禁止 `lake update`**）；
+1. Lean 工具链本机**已装**（`~/.elan`，`leanprover/lean4:v4.34.1` = `lean-toolchain` 钉的版本），
+   只是不在默认 PATH：先 `export PATH="$HOME/.elan/bin:$PATH"`。Mathlib 钉
+   `d13f23b723b8a846827a245b89c10fc7d3f11612`（与参考仓库 N = 7 工程同款；**禁止 `lake update`**）；
+   `formal/lean/.lake/packages/` 已软链到 `../thomson-n9` 的同 rev 预编译包（`.lake/` 已 gitignore，
+   见 `PROGRESS.md` 6.6.1），可离线构建；
 2. `bash formal/lean/scripts/check.sh` 逐步通过：哈希（`scripts/pin_hashes.sh` 先钉
    `SHA256SUMS.txt`）、前言一致性、token 扫描、`lake build`（挑战文件恰有 2 个 `sorry` 警告）、
    公理检查（只允许 `propext, Classical.choice, Quot.sound`）、逐常量语句比对；
@@ -86,8 +89,9 @@ C2v 对称的「边收缩二十面体」）。唯一性的严格表述以及最�
 | 仓库骨架（README/PROGRESS/notes/formal/numerics/scripts） | ✅ 奠基运行完成 |
 | 数值复现 E₁(11) = 40.596450508（含勘误裁定） | ✅ 奠基运行完成，验收门 1 通过 |
 | v2 升级：参考能量读 energies.json + `--selftest` 负控制 + `check.sh` 全判定 | ✅ 2026-10-02 完成（见 `PROGRESS.md` 第 6 节） |
-| Lean 挑战命题（基础定义 + M0/M1，全 `sorry`） | ✅ 奠基运行完成（未编译，见下） |
-| Lean 包构建 / `check.sh` 构建段 / 负控制 | ⏸ 未运行：本机无 Lean 工具链，留给后续运行（v2 已用桩 `lake` 验证判定逻辑并逐项实测失败路径） |
+| Lean 挑战文件编译验证 | ✅ v2.1 完成（`lake build` 成功、恰 2 条 sorry 警告、`negative-control.sh` 通过；此前 v2 误记「本机无工具链」，实为 `~/.elan` 不在 PATH，勘误见 `PROGRESS.md` 6.6） |
+| Lean 挑战命题（基础定义 + M0/M1，全 `sorry`） | ✅ 奠基运行完成；v2.1 已编译验证 |
+| `check.sh` 步骤 6/7 通过 / Lean Comparator / 第二内核 | ⏸ 待证明写入 Solution（步骤 6/7 当前按设计失败）；Comparator/nanoda 任务书未要求，未配置 |
 | M0 / M1 / 最终定理的证明 | ⏬ 未开始（见 `notes/strategy.md`） |
 
 ## 5. 仓库结构

@@ -1,7 +1,8 @@
 # PROGRESS（工作日志）
 
 本文件由各次运行依次追加。当前记录：**奠基运行，2026-10-02**（第 1–5 节）；
-**升级运行 v2，2026-10-02**（第 6 节：负控制与验收门加固）。
+**升级运行 v2，2026-10-02**（第 6 节：负控制与验收门加固；6.4 首版有误，
+**v2.1 复审修复**见 6.6，并附 Lean 侧实跑结果）。
 
 ## 1. 本次做了什么
 
@@ -215,14 +216,15 @@ FAILED），再加正控制（真参考必须放行）。全部符合才打印 `
 SORRY-COUNT CHECK FAILED；新鲜构建（2 警告）与全缓存构建（0 警告）均通过步骤 5。正控制
 （未篡改的真实树，`SKIP_BUILD=1 bash scripts/check.sh`）退出码 0。
 
-### 6.4 没有跑过的检查（如实记录）
+### 6.4 没有跑过的检查（如实记录；**本节首版有误，见 6.6 勘误**）
 
-- **Lean 构建仍未运行**：本机无 elan/lake/lean（`which elan lake lean` 均无；v1 记录的工具链
-  缺失依旧），`check.sh` 步骤 4–7 的 Lean 侧（真实 `lake build`、公理检查、语句比对、
-  `negative-control.sh`）未执行；6.3 的桩测试只验证**判定逻辑**，不验证 Lean 本身。与 v1
-  第 2/4 节一致，留给装好工具链的后续运行。
-- `bash -n` 校验加固后的 `check.sh` 通过；`python3 -m py_compile` 校验改后的
-  `optimize.py` 通过。
+- **Lean 构建在 v2 提交时未运行**。本节首版把理由写成「本机无 elan/lake/lean／无 Lean 工具链」——
+  **这是错的**：我当时只跑了 `which elan lake lean`（三者在 PATH 外 → not found），就把
+  「不在 PATH」误读成「机器没装」。实际 `~/.elan` 下有完整工具链（见 6.6 复核与勘误）。
+  v2 提交时（21:01–21:05）未做任何 Lean 侧检查的**真实**原因是：我没有检查 `~/.elan`。
+  正确记录应为「工具链在 `~/.elan/bin`，未加入当时 shell 的 PATH，我未发现」。
+- v2 已做的替代验证：桩 `lake` 逐项实测判定逻辑（8 种篡改均 exit 1），**不验证 Lean 本身**；
+  `bash -n` 校验加固后的 `check.sh`；`python3 -m py_compile` 校验改后的 `optimize.py`。
 
 ### 6.5 v2 验收门（工作流命令逐字执行）
 
@@ -231,3 +233,56 @@ SORRY-COUNT CHECK FAILED；新鲜构建（2 警告）与全缓存构建（0 警�
 | 1 | `python3 thomson-n11/numerics/optimize.py` | ✅ 退出码 0（E_best = 40.596450508190578，\|gap\| = 1.906e-10；reference_config.json sha256 仍为 90ae9afd…，与 1.2 记录一致） |
 | 2 | `python3 thomson-n11/numerics/optimize.py --selftest` | ✅ 退出码 0，打印 PASS（±0.5 两个错参考均被拒，正控制通过） |
 | 3 | `git -C thomson-n11 status --porcelain` | ✅ 输出为空 |
+
+### 6.6 复审修复（2026-10-02 晚，v2.1）：勘误 6.4 并实跑 Lean 侧检查
+
+复审（medium）指出 6.4 的「本机无 elan/lake/lean」不属实。逐项复核确认（本次运行执行）：
+
+    ls ~/.elan/bin                → elan lake lean leanc leanchecker …（工具链在，只是不在 PATH）
+    ~/.elan/bin/lake --version    → Lake version 5.0.0-src+5045d00 (Lean version 4.34.1)
+    ~/.elan/toolchains/           → leanprover--lean4---v4.34.1（= lean-toolchain 钉的版本）
+    git -C ../thomson-n9/formal/lean/.lake/packages/mathlib rev-parse HEAD
+                                  → d13f23b723b8a846827a245b89c10fc7d3f11612
+                                    （与 n11 lake-manifest.json 钉的 mathlib rev 逐位相同；
+                                     9 个依赖包 rev 经比对全部一致；mathlib olean 8548 个）
+
+即本机工具链 + 同 rev 预编译 Mathlib 均在（n9 于 19:19–19:24 构建过），v2 完全有条件跑 Lean 侧。
+教训已记：**PATH 探测的负结果 ≠ 工具不存在；本版起 Lean 侧检查照跑，记录照实。**
+
+#### 6.6.1 实跑结果（全部本次执行，命令与关键输出）
+
+离线复用 n9 的包：把 `formal/lean/.lake/packages/` 下 9 个依赖目录软链到 n9 的同名目录
+（`.lake/` 已被 `formal/lean/.gitignore` 忽略，不污染工作树；两仓库 manifest 的包 rev 逐位
+一致，lake 直接接受，零下载）。
+
+    export PATH="$HOME/.elan/bin:$PATH"
+    lake exe cache get                     → No files to download / Already decompressed 8908 file(s)
+    /usr/bin/time -p lake build ThomsonN11 ComparatorChallenges
+                                           → Build completed successfully (8928 jobs)，20.77 s
+                                             恰 2 条警告：ComparatorChallenges/ThomsonN11.lean:78:8
+                                             与 84:8 "declaration uses `sorry`"；Solution 零警告
+                                             （缓存重建 rc=0，lake 5 对缓存模块 "Replayed" 并重发警告）
+
+**v1 第 2 节「挑战文件未经编译验证」的最大风险就此关闭**：挑战文件在钉死的工具链 + 钉死 rev 的
+Mathlib 上完整 elaborate 通过，sorry 数恰为设计的 2（M0/M1）。同时关闭 v1 第 4 节遗留 1 的
+manifest 疑问：原样拷贝（根包名仍是 ThomsonN7）不引发任何错误，无需改。
+
+加固版 `bash scripts/check.sh` 全量实跑，退出码 1，逐 步状态：
+
+| 步骤 | 结果 |
+| --- | --- |
+| 1 哈希 | 按设计跳过（SHA256SUMS.txt 未钉） |
+| 2 前言 / 3 token / 3b 卫生 | 通过（Solution 占位：2 按设计 DEFERRED；3、3b 零命中） |
+| 4 工具链 | 通过（cache get 零下载） |
+| 5 构建+判定 | **通过**：源级 sorry 计数 2/0，日志级警告 2/0，构建 rc=0 |
+| 6 公理 | **按设计失败**：CheckAxioms 引用 `ThomsonN11.thomson_eleven_M0/M1`，Solution 占位未声明 → unknown identifier → 加固判定 `AXIOM DUMP FAILED` + exit 1（判定逻辑实弹生效；证明写入 Solution 后此步才可能通过） |
+| 7 语句比对 | 脚本未到达（6 已止步）；手动单跑：Challenge.tsv 10 常量 dump 成功；Solution 侧 0 行 → 比对按设计 FAILED（exit 1），全部 10 常量报 missing |
+
+    bash scripts/negative-control.sh    → NEGATIVE CONTROL OK（退出码 0）
+                                          篡改 M1 不等号后：mismatches 恰为
+                                          ['ThomsonN11.thomson_eleven_M1'] 且 FAILED——语句比对确有牙齿
+
+#### 6.6.2 仍未运行（如实记录）
+
+- Lean Comparator / 第二内核（nanoda）：任务书未要求，未配置（v1 同）。
+- check.sh 步骤 6/7 的**通过**：待 M0/M1 证明写入 Solution（奠基设计如此），当前失败均为设计内。
