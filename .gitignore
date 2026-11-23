@@ -3,6 +3,7 @@
 # running optimize.py" stays robust across scipy/numpy versions). Its sha256 from the foundation
 # run is recorded in PROGRESS.md 1.2.
 numerics/reference_config.json
+numerics/bounds/results/sdpa_work/
 
 __pycache__/
 *.pyc

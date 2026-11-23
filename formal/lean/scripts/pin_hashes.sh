@@ -14,7 +14,7 @@ SUMS=SHA256SUMS.txt
 files() {  # the frozen set: everything in the package except the sums file itself and build noise
   find .gitignore lakefile.toml lake-manifest.json lean-toolchain \
        ThomsonN11.lean ThomsonN11 ComparatorChallenges scripts \
-       -type f ! -name "$SUMS" | sed 's#^\./##' | LC_ALL=C sort
+       -type f ! -name "$SUMS" ! -name '*.pyc' ! -name '.DS_Store' ! -path '*/__pycache__/*' | sed 's#^\./##' | LC_ALL=C sort
 }
 case "${1:-}" in
   --check)
@@ -37,6 +37,7 @@ case "${1:-}" in
       printf '  %s\n' "$p" >> "$tmp"
     done
     mv "$tmp" "$SUMS"
+    chmod 0644 "$SUMS"
     echo "wrote $SUMS:"; cat "$SUMS"
     ;;
   *) echo "usage: $0 [--check]"; exit 2 ;;

@@ -2,7 +2,8 @@
 
 本文件由各次运行依次追加。当前记录：**奠基运行，2026-10-02**（第 1–5 节）；
 **升级运行 v2，2026-10-02**（第 6 节：负控制与验收门加固；6.4 首版有误，
-**v2.1 复审修复**见 6.6，并附 Lean 侧实跑结果）。
+**v2.1 复审修复**见 6.6，并附 Lean 侧实跑结果）；
+**Phase 0–2 攻坚运行，2026-11-23**（第 7 节：80-dps $C_{2v}$ 驻点与黎曼谱诊断、精确有理 $S_3$/$(2,9)$ 三点 SDP 扫阶与本征间隙根因定位、Lean 4 内核形式化证毕 `M0`/`M1`/`thomson_eleven_sdp_M10`/`thomson_eleven_upper_bound`）。
 
 ## 1. 本次做了什么
 
@@ -286,3 +287,76 @@ manifest 疑问：原样拷贝（根包名仍是 ThomsonN7）不引发任何错�
 
 - Lean Comparator / 第二内核（nanoda）：任务书未要求，未配置（v1 同）。
 - check.sh 步骤 6/7 的**通过**：待 M0/M1 证明写入 Solution（奠基设计如此），当前失败均为设计内。
+
+---
+
+## 7. Phase 0–2 攻坚运行（2026-11-23）：80-dps 驻点诊断、三点 SDP 本征松弛间隙定位与 Lean 4 形式化证明
+
+### 7.1 Phase 0A：80-dps $C_{2v}$ 边收缩二十面体驻点与 $22\times 22$ 黎曼 Hessian 谱
+
+新增 `numerics/bounds/phase0_candidate.py` → `numerics/bounds/results/phase0_candidate.json`：
+
+- 采用**北极有理球极投影** $(u,v) \mapsto \bigl(\frac{2u}{1+u^2+v^2}, \frac{2v}{1+u^2+v^2}, \frac{1-u^2-v^2}{1+u^2+v^2}\bigr)$（南极固定在 $(0,0,-1)$）无根号参数化 $C_{2v}$（$1+2+2+2+4$）5 维对称子流形 $(t_1, t_2, t_3, u_4, v_4)$；
+- 在 80-dps `mpmath` 下牛顿迭代至切向梯度 $\|\nabla_{S^2} E(X^*_{11})\|_\infty = 8.52 \times 10^{-81}$，能量：
+  $$E^*(11) = 40.5964505081906053866355313583344730183533640678192039000471\dots$$
+- 次低局部极小（$C_{5v}$ 去顶二十面体 $1+5+5$）80-dps 能量为 $40.61511733694649722478\dots$（间隙 $+0.0186668288$）；
+- 全球面 $22\times 22$ 黎曼 Hessian 谱：3 个 $\mathfrak{so}(3)$ 旋转零模（$\le 1.73\times 10^{-80}$）与 19 个严格正特征值，$\lambda_{\min}(H_0) = 0.0906732176562291324367\dots$，$\lambda_{\max}(H_0) = 7.6248624744517\dots$（5 维 $C_{2v}$ 子空间最小特征值 $0.8103354558\dots$）；
+- 全部 55 对点对分裂为 **20 个不同内积轨道**，最小内积 $m^* = -0.999022793459447612728\dots$（重数 2，两对不相交近对跖点 `(3,6)` 与 `(4,5)`），次小内积 $-0.94331002254210\dots$（重数 2），最大内积 $+0.52190976643867\dots$（重数 2），最小能级间隔 $g_{\min} = 0.00369731146725\dots$（L06 与 L07 之间）。
+
+### 7.2 Phase 0B：精确有理 $S_3$ / $(2,9)$ 三点 SDP 阶梯扫描与本征间隙根因定位（Path B 确立）
+
+新增纯 `Fraction` 精确引擎 `numerics/bounds/{exact_linalg,sym_cap_sdpa,sym_strip_sdpa,phase0_sdp_sweep,phase0_gap_diagnosis,verify_all}.py`，配合 200/224-bit `SDPA-GMP` 产出 `certificates/` 下 **13 张精确有理证书**（共 296 个半正定块，全部经精确 `Fraction` $LDL^T$ 与三点组合恒等式 `identity_error = 0` 独立复验）：
+
+1. **全局 $S_3$（$a_0 = -1$）阶梯**：
+   - $(M,K) = (6,6)$：`40.5333157018172514`（$\Delta = 0.06313481$）
+   - $(M,K) = (7,7)$：`40.5453147857027282`（$\Delta = 0.05113572$）
+   - $(M,K) = (8,8)$：`40.5514942893318988`（$\Delta = 0.04495622$）
+   - $(M,K) = (9,9)$：`40.5541606368310156`（$\Delta = 0.04228987$）
+   - **$(M,K) = (10,10)$**：**`40.5554717043707456`**（$\Delta = 0.04097880$，$R_1 = 2.07\times 10^{-33}$，$R_2 = 5.92\times 10^{-31}$，已入 Lean 4 内核定理 `thomson_eleven_sdp_M10`）
+   - **$(M,K) = (12,12)$**：**`40.5569603294090371`**（$\Delta = 0.03949018$，224-bit `SDPA-GMP` `9541.6s` `pdOPT`，$R_1 = 5.25\times 10^{-32}$，$R_2 = 2.31\times 10^{-29}$，26 块 `identity_err = 0`）。
+   在 $(12,12)$ 处，$F_0\dots F_8$ 活跃（$\operatorname{tr} F_8 = 0.02057$），奇阶 $F_9 \approx 3.44\times 10^{-20}$、$F_{11} \approx 5.72\times 10^{-23}$ 严格失活，偶阶 $F_{10} = 1.05\times 10^{-4}$ 激活（与正二十面体群 $I_h$ 球谐不变量度数 $\ell \in \{0, 6, 10, \dots\}$ 完全吻合），两阶跃升合计仅增 `+0.0014886`，实证确认三点 SDP 渐近饱和于 $\approx 40.557 < E^*(11)$。
+2. **截断与 $(2,9)$ typed 条带加强探针**：
+   - 下界截断 $a_0 = -1023/1024 < m^*$：$(6,6)\to 40.53332037$，$(8,8)\to 40.55151609$，$(10,10)\to 40.555539579695$（$\Delta = 0.04091093$），**$(12,12)\to 40.5569708647357743$**（`9608.9s` `pdOPT`，$R_1 = 4.76\times 10^{-32}$，$R_2 = 5.57\times 10^{-29}$，$\Delta = 0.03947964$）；
+   - 上界截断 $a_0 = -1, b_0 = 53/100$：$(8,8)\to 40.55178721$；
+   - 深帽截断：$(8,8), a_0 = -49/50 \to 40.55495240$；$a_0 = -9/10 \to 40.58493495$（真球面约束极小为 `40.63245`，三点 SDP 仍有 `0.0475` 松弛间隙且未越过 $E^*(11)$）；
+   - $(2,9)$ typed 极环条带：`[-1, -1023/1024]` 在 $(6,6)$ 下为 `40.53687092`；含 $m^*$ 的极窄条带 `[-9991/10000, -999/1000]` 在 $(7,7)$ 下为 `40.54800350`（$\Delta = 0.048447$）。
+3. **本征松弛间隙（$\Delta \approx 0.0395$）的几何根因（`results/phase0_gap_diagnosis.json`）**：
+   - 在 $X^*_{11}$ 真矩上的 1D 多项式次估 LP 在 $M=8$（$D=14$）时已达 `40.59645010`（间隙 $4.04\times 10^{-7}$），排除多项式逼近阶数瓶颈；
+   - $(10,10)$ 对偶最优伪矩的 9 节点 Gauss–Christoffel 测度在 $t_1 = -0.999637$ 处放置了 **`3.3946` 对分数对跖点**（$H^*(-1) = \varphi(-1) = 0.5$），在 $t \approx \mp 1/\sqrt{5}$ 附近放置 `18.01` 与 `21.87` 对二十面体邻接点对；
+   - 真实 $\mathbb{R}^3$ 球面含 $k$ 对精确对跖点的最小能量为：$k=0: 40.596451$，$k=1: 40.596907$（仅 $+4.57\times 10^{-4}$），$k=2: 40.597677$（仅 $+1.23\times 10^{-3}$），$k=3: 40.625784$（$+0.0293$），$k=4: 40.780435$（$+0.1840$）。$k=1,2$ 真构型阻断了近对跖区间排除，而三点 SDP 缺少四点秩 3 条件 $\det G_4 = 0$，利用约 $3.4$ 对分数对跖点吸收 11 点相对 12 点二十面体的拓扑缺陷而免付三维嵌入受挫代价。
+
+### 7.3 Phase 1 & Phase 2（Path B）：Lean 4 内核形式化证明与全门验收
+
+在绝对不修改 `ComparatorChallenges/ThomsonN11.lean`、零 `sorry`、零 `native_decide`、仅使用 `[propext, Classical.choice, Quot.sound]` 三条标准公理的前提下，完成 `ThomsonN11/StageB/` 与 `ThomsonN11/Solution.lean` 形式化：
+
+1. **里程碑 `thomson_eleven_M0`（`55/2 = 27.5`）与 `thomson_eleven_M1`（`155/4 = 38.75`）**：在 `Solution.lean` 中由直径不等式及二次次估 $f(t)=\frac{7}{10}+\frac{2}{5}t+\frac{7}{40}t^2$（六平方 Lukács 证书 + 一/二阶球谐矩，给出 `583/15 > 155/4`）直接证毕。
+2. **加强全局三点 SDP 下界 `thomson_eleven_sdp_M10`（`2027773585218537 / 50000000000000 = 40.55547170437074`）**：
+   - `StageB/ThreePoint.lean`：球面三点 Bachoc–Vallentin 正定性（复 de Moivre 展开）与 11 点 $S_3$ / $(2,9)$ 组合装配恒等式；
+   - `StageB/PolyKronDefs.lean` + `PolyKron.lean` + `PolyKronFast.lean`：**零 Mathlib（纯 `Init`）数据层架构**，使 `SdpCertHarmData`、`SdpCertSosData` 与全部 19 个并行切片模块 `SdpCertSosSlice{M9..9}` 免除 Mathlib 导入（单进程内存 `< 300 MB`），由 `export_lean_sdp.py`（`B = 72`）导出纯整数 Cholesky 与 2D-Kronecker 证书，在 `StageB/SdpCert.lean` 中收口 `global_sdp_lower_bound`。
+3. **精确有理 $C_{2v}$ 构型上界 `thomson_eleven_upper_bound`（`2029822525409531 / 50000000000000 = 40.59645050819062`）与双边夹逼 `thomson_eleven_bounds_sandwich`**：
+   - 由 `export_lean_upper.py` 导出 100% 纯 `ℤ` 齐次球极投影见证 `StageB/UpperBound.lean`（距 $E^*(11)$ 仅 $1.46\times 10^{-14}$），规避 `ℚ` 通分开销。
+4. **验收门加固与实跑**：
+   - `python3 numerics/optimize.py` & `optimize.py --selftest`：exit 0；
+   - `python3 numerics/bounds/sym_cap_sdpa.py --selftest` & `sym_strip_sdpa.py --selftest`：exit 0；
+   - `python3 numerics/bounds/verify_all.py`：1322.84s exit 0（13 张证书 296 个 PSD 块 + 21 组有理球面构型 + NC1–NC4 四项负对照全过）；
+   - `bash formal/lean/scripts/check.sh`（全包 `SHA256SUMS.txt` 哈希锁定、基础定义逐字核对、去注释禁用记号扫描、`lake build` 源级/日志级 `sorry` 2/0、5 项顶层定理 `#print axioms` 严格三公理白名单、10/10 挑战常量比对 OK）与 `bash formal/lean/scripts/negative-control.sh`（语句翻转 NC1 + 内核篡改 NC2 双拦截）：全部 exit 0。
+
+---
+
+## 8. 独立审校加固与四点 SDP 层级实测运行（2026-11-24）
+
+### 8.1 修复前序尝试的复现缺陷、缺失产物与门控盲区
+1. **修复 `phase0_gap_diagnosis.py` 崩溃并补全全部诊断计算**：移除对已清理临时文件 `results/sdpa_work/n11_am1_M10_K10/*.result` 的硬编码依赖及残留 `eval()`，改为从已提交精确证书直接读取 `(10,10)` 与 `(12,12)` 谐波块矩阵并在独立 `TemporaryDirectory` 中求解对偶矩，同时新增可复现的 $X^*_{11}$ 真矩 1D 次估 LP（$M=4,6,8,10,12$）与 $k$-对跖（$k=0\dots 5$）球面约束极小能量阶梯计算，独立生成 `results/phase0_gap_diagnosis.json`。
+2. **补全 `(2,9)` typed 条带精确证书、证书汇总账本与高速精确校验**：
+   - 在 `exact_linalg.py:is_positive_definite` 中采用精确整数 Bareiss Sylvester 顺序主子式消元替代高维有理分式 GCD 爆炸的逐列分式 $LDL^T$，并在 `sym_cap_sdpa.py` 中预收缩三点恒等式张量幂，在保持 100% 纯整数/有理数零浮点妥协的前提下将全量证书复验耗时从 `1322.8s` 压缩至数分钟以内；
+   - 为 `sym_strip_sdpa.py` 补全 `write_certificate` 与 `verify_certificate_file`（含精确 Bareiss 正定检验、Lukács 残差重算及 `(2, n-2)` 组合恒等式零误差校验），生成并入库 2 张 `(2,9)` 条带精确证书（`n11-symstrip-n11_strip_m1_m1023o1024_M6_K6.json` 与 `n11-symstrip-n11_strip_m9991o10000_m999o1000_M7_K7.json`）；
+   - 更新 `phase0_sdp_sweep.py` 生成此前缺失的 `results/phase0_sdp_sweep.json`（覆盖全部 **15 张精确证书、410 个半正定块**），并将 `verify_all.py` 扩展至 `symcap + symstrip` 双族全量复验与 **6 项负对照（NC1–NC6）**。
+3. **加固 Lean 4 门控脚本 `check.sh`、`negative-control.sh` 与文档注释**：
+   - 修正 `ThomsonN11/StageB/ThreePoint.lean` 中 `cap_assembly_11` 文档注释遗留的 $N=9$ 常数（统一为定理陈述中的 `e/55`、`9*sym3`、`s 1 1 1 / 10`）；
+   - 修复 `formal/lean/scripts/check.sh` 第 1 步仅扫 `git ls-files` 漏检未跟踪包内文件的漏洞（同步扫描工作树包目录全集），并修复第 3 步 `strip_lean_comments` 未识别字符串/字符字面量（如 `"/-"` 伪造块注释包裹 `skipKernelTC`）的解析漏洞，在 `negative-control.sh` 中新增 **NC3 字符串伪注释偷渡拦截测试**，重新运行 `pin_hashes.sh`、`check.sh` 与 `negative-control.sh` 全部 exit 0。
+
+### 8.2 Phase 0C：$S_{11}\times O(3)$ 约化耦合四点 SDP 层级实测（`phase0_4pt_probe.py`）
+新增 `numerics/bounds/phase0_4pt_probe.py` $\to$ `numerics/bounds/results/phase0_4pt_probe.json`，实现完整的四点局部与全局半定约束（$\det G_4 = 0$ 理想乘子、$\mathbb{Z}_2\times\mathbb{Z}_2$ 4 点 SOS、Binet–Cauchy `Harm4_odd`、对旗 `Flag2_even` 及 $(\mathbb{R}^3)^{\otimes d}$ 全局点对张量块 `GlobNat_d*`/`GlobAx_d*`，全部通过随机球面构型精确 `Fraction` 恒等式零误差自测）：
+- $M=4$（$D_3 = 6$）：纯三点 `40.328025578797` $\to$ 耦合 $D_4 = 6$ 四点 **`40.491098499829`**（增益 **`+0.163072921032`**）；
+- $M=5$（$D_3 = 8$）：纯三点 `40.506357627168` $\to$ 耦合 $D_4 = 6$ 得 `40.506512909564`（`+0.00015528`），耦合 $D_4 = 8$ 得 **`40.514179689124`**（增益 **`+0.007822061955`**）；
+- $M=8$（$D_3 = 14$）：纯三点 `40.551494289332` $\to$ 耦合 $D_4 = 4, 6$ 增益为 `0.000000000000`（`< 2e-13`），实证确立低阶四点（$D_4 \le 8$，天花板 `40.51418`）尚不足以分辨 9 个分数二十面体伪原子，要跨越 `~40.557` 三点松弛极限需推进至 $D_4 \ge 14\text{--}18$ 高阶四点 SDP 或多极联合分支定界。
