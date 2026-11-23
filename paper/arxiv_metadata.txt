@@ -1,0 +1,31 @@
+Title:
+Certified Two-Sided Energy Bounds in Lean 4 and the Three-Point Semidefinite Obstruction for the Eleven-Point Thomson Problem
+
+Authors:
+Yang Li (Changsha University of Science and Technology, Changsha, China; ORCID: 0009-0005-2070-2282; Email: ly3069777195@outlook.com)
+
+Primary Category:
+math.MG (Metric Geometry)
+
+Cross-list Categories:
+math.OC (Optimization and Control)
+cs.LO (Logic in Computer Science)
+
+MSC-class:
+52A40, 31C20 (Primary); 90C22, 68V20, 52C17 (Secondary)
+
+Comments:
+15 pages, 3 figures. Complete Lean 4 formal proof package (v4.34.1, Mathlib d13f23b7), 15 exact rational Stage A SDP certificates (410 positive-definite blocks), four-point SDP hierarchy probe, and one-command verification scripts available at https://github.com/Refrain-Xe/Thomson-N-11-Formalization-And-Verification
+
+Abstract:
+We investigate the eleven-point Thomson problem of minimizing the discrete Coulomb energy E(x) = sum_{0 <= i < j < 11} 1 / ||x_i - x_j|| over configurations of eleven distinct points on the unit sphere S^2 in R^3. First, we establish a fully kernel-checked two-sided rational energy bracket in Lean 4 over Mathlib (leanprover/lean4:v4.34.1): 40.55547170437074 = 2027773585218537/50000000000000 <= E_1(11) <= 2029822525409531/50000000000000 = 40.59645050819062, together with formal proofs of the elementary milestones E(x) >= 55/2 and E(x) >= 155/4. The lower bound is certified via an S_3-equivariant degree-18 three-point semidefinite programming (SDP) certificate at order (M,K) = (10,10), verified inside the Lean 4 kernel through a zero-Mathlib Init data layer, binary bit-tries, and 19 parallel two-dimensional Kronecker evaluation slices. The upper bound is realized by an explicit rational C_{2v} configuration constructed via north-pole stereographic projection (stored as pure integer Pythagorean quadruples with zero square roots), lying within 1.46e-14 of the 80-digit stationary energy E*(11) ~ 40.59645050819060538664. All Lean proofs use zero sorrys, no native_decide, and only Lean's three standard axioms (propext, Classical.choice, Quot.sound). Second, we explain why the remaining gap ~ 0.0410 does not close under the three-point SDP framework that recently settled N = 7, 8, 9. Using 15 independently verified exact rational certificates (410 positive-definite blocks) extending up to degree 22 at (M,K) = (12,12) (40.556960329409, gap 0.039490), cap truncations, and (2,9)-typed pole-ring strips, we diagnose an intrinsic fractional-icosahedral pseudo-moment obstruction: the optimal dual three-point pseudo-measure places 3.395 fractional antipodal pairs near t = -1 and exhibits the exact icosahedral I_h harmonic parity selection rule (F_9, F_{11} inactive, F_{10} active), bypassing the R^3 four-point rank-3 determinant constraint det G_4 = 0 that imposes a sharp energy wall on true spherical configurations with k >= 3 antipodal pairs. Finally, we implement an exact rational S_{11} x O(3)-reduced coupled four-point SDP hierarchy probe, proving strict matched-degree lifts (+0.1631 at degree 6, +0.00782 at degree 8) while demonstrating that breaking the ~40.557 three-point ceiling requires four-point degree D_4 >= 14 or multi-pair matching branch-and-bound.
+
+License:
+arXiv.org perpetual, non-exclusive license to distribute (or CC BY 4.0 for Zenodo)
+
+Zenodo Notes:
+- Resource type: Publication -> Preprint
+- Creator: Li, Yang (ORCID: 0009-0005-2070-2282; Affiliation: Changsha University of Science and Technology, Changsha, China)
+- Upload file: paper/thomson-n11-paper.pdf
+- Related identifier (isSupplementedBy): https://github.com/Refrain-Xe/Thomson-N-11-Formalization-And-Verification
+- Related identifier (continues / references): 10.5281/zenodo.24453172

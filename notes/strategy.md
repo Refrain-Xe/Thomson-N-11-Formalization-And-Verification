@@ -1,99 +1,100 @@
-# 攻坚路线与数学障碍诊断（notes/strategy.md）
+# Proof Strategy, Obstruction Analysis, and Closure Roadmap (`notes/strategy.md`)
 
-本文档记录 Thomson 问题 $N = 11$ 从奠基阶段（路线设计）到 Phase 0–2 实测攻坚后的**精确数学结论、已形式化成果与下一代闭合路线图**。
-
----
-
-## 1. 候选极小构型的精确代数-几何结构（Phase 0A 实测）
-
-通过**北极有理球极投影** $(u,v) \mapsto \bigl(\frac{2u}{1+u^2+v^2}, \frac{2v}{1+u^2+v^2}, \frac{1-u^2-v^2}{1+u^2+v^2}\bigr)$（南极固定在 $(0,0,-1)$），$N = 11$ 的猜想全局极小构型——$C_{2v}$ 对称「边收缩二十面体」（轨道分解 $11 = 1 + 2 + 2 + 2 + 4$）被精确无根号参数化为 5 个自由实参数 $(t_1, t_2, t_3, u_4, v_4)$：
-
-- 80-dps 牛顿法驻点（`numerics/bounds/results/phase0_candidate.json`）：
-  - $t_1 = 0.327791655942445260192283\dots$
-  - $t_2 = 0.536744080969946669690332\dots$
-  - $t_3 = 1.768141527819571963164699\dots$
-  - $u_4 = 1.029202574133262161829356\dots$
-  - $v_4 = 0.587901288444605685653989\dots$
-- 球面切向梯度范数 $\|\nabla_{S^2} E(X^*_{11})\|_\infty = 8.52 \times 10^{-81}$，能量
-  $$E^*(11) = 40.59645050819060538663553135833447301835336406781920\dots$$
-- 完整 $22\times 22$ 黎曼 Hessian 谱：3 个 $\mathfrak{so}(3)$ 刚体旋转零模（$\le 1.73\times 10^{-80}$）与 19 个严格正特征值，最小正特征值 $\lambda_{\min}(H_0) = 0.090673217656229\dots$（$C_{2v}$ 5 维对称子空间最小特征值 $0.8103354558\dots$）。
-- 55 对点对分裂为 **20 个不同内积能级**：
-  - 最小内积 $m^* = -0.99902279345944761273\dots$（重数 2，两对不相交近对跖点 `(3,6)` 与 `(4,5)`，夹角 $177.466^\circ$），**无精确对跖点对**；
-  - 次小内积 $-0.94331002254210\dots$（重数 2），最大内积 $+0.52190976643867\dots$（重数 2）；
-  - 相邻能级最小间隔 $g_{\min} = 0.00369731146725\dots$（位于 `-0.46891710` 与 `-0.46521979` 之间）。
-- 有理球极投影的**Lean 4 零根号优势**：对任意有理参数 $(t_1, t_2, t_3, u_4, v_4) \in \mathbb{Q}^5$，映出的 11 个点**恒精确落在单位球面 $S^2$ 上**（$X_i^2 + Y_i^2 + Z_i^2 = D_i^2$），无需任何平方根区间包络即可在 Lean 4 内核中直接给出精确有理球面见证 `StageB.UpperBound.c2vWitness`（证明 $E_1(11) \le 2029822525409531 / 50000000000000 = 40.59645050819062$）。
+This note records the algebraic-geometric structure of the conjectured $N = 11$ Thomson minimizer, our exact three-point semidefinite programming (SDP) relaxation diagnosis, the Lean 4 Stage B architecture, the coupled four-point SDP hierarchy probe, and the roadmap toward a complete uniqueness proof.
 
 ---
 
-## 2. 三点半定规划（3-Point SDP）紧性实验与本征松弛间隙诊断（Phase 0B）
+## 1. Algebraic-Geometric Structure of the Conjectured Minimizer (Phase 0A)
 
-### 2.1 实测数据汇总
+Using **rational north-pole stereographic projection**
+$$(u,v) \;\longmapsto\; \left(\frac{2u}{1+u^2+v^2},\; \frac{2v}{1+u^2+v^2},\; \frac{1-u^2-v^2}{1+u^2+v^2}\right),$$
+with vertex $0$ fixed at the south pole $(0,0,-1)$, the conjectured global minimizer for $N = 11$---the $C_{2v}$ **edge-contracted icosahedron** with vertex-orbit decomposition $11 = 1 + 2 + 2 + 2 + 4$---is parameterized without square roots by five free real parameters $(t_1, t_2, t_3, u_4, v_4)$:
 
-使用纯 `Fraction` $S_3$ 同型约化引擎 `sym_cap_sdpa.py`（解除 `K=6` 限制，支持完整 $K = M$）与 $(2,9)$ 极环 typed 引擎 `sym_strip_sdpa.py`，在 `SDPA-GMP` 高精度求解 + 精确 $LDL^T$ 修复下得到如下严格下界：
-
-| 模型与区间约束 | $(M, K)$ | 多项式次数 $D$ | 精确认证下界 $e_{\mathrm{cert}}$ | 距 $E^*(11)$ 间隙 $\Delta$ |
-| --- | --- | --- | --- | --- |
-| 全局 $S_3$，$t \in [-1, 1]$ | $(6, 6)$ | $10$ | `40.533315701817` | `0.06313481` |
-| 全局 $S_3$，$t \in [-1, 1]$ | $(7, 7)$ | $12$ | `40.545314785703` | `0.05113572` |
-| 全局 $S_3$，$t \in [-1, 1]$ | $(8, 8)$ | $14$ | `40.551494289332` | `0.04495622` |
-| 全局 $S_3$，$t \in [-1, 1]$ | $(9, 9)$ | $16$ | `40.554160636831` | `0.04228987` |
-| **全局 $S_3$，$t \in [-1, 1]$（已入 Lean 4）** | **$(10, 10)$** | **$18$** | **`40.555471704371`** | **`0.04097880`** |
-| **全局 $S_3$，$t \in [-1, 1]$（Stage A 最强全局证书）** | **$(12, 12)$** | **$22$** | **`40.556960329409`** | **`0.03949018`** |
-| 近对跖截断 $S_3$，$t \in [-1023/1024, 1]$ | $(6, 6)$ | $10$ | `40.533320366836` | `0.06313014` |
-| 近对跖截断 $S_3$，$t \in [-1023/1024, 1]$ | $(8, 8)$ | $14$ | `40.551516085750` | `0.04493442` |
-| 近对跖截断 $S_3$，$t \in [-1023/1024, 1]$ | $(10, 10)$ | $18$ | `40.555539579695` | `0.04091093` |
-| **近对跖截断 $S_3$，$t \in [-1023/1024, 1]$** | **$(12, 12)$** | **$22$** | **`40.556970864736`** | **`0.03947964`** |
-| 上界截断 $S_3$，$t \in [-1, 53/100]$ | $(8, 8)$ | $14$ | `40.551787212256` | `0.04466330` |
-| 深帽截断 $S_3$，$t \in [-49/50, 1]$ | $(8, 8)$ | $14$ | `40.554952399256` | `0.04149811` |
-| 强帽截断 $S_3$，$t \in [-9/10, 1]$ | $(8, 8)$ | $14$ | `40.584934945776` | 仍低于 $E^*(11)$ `0.0115`（真约束极小 `40.63245`） |
-| $(2,9)$ typed 条带，$t_{01} \in [-1, -1023/1024]$ | $(6, 6)$ | $10$ | `40.53687092` | `0.05957959` |
-| $(2,9)$ typed 窄带，$t_{01} \in [-9991/10000, -999/1000] \ni m^*$ | $(7, 7)$ | $12$ | `40.54800350` | `0.04844701` |
-
-*注*：在 224-bit `SDPA-GMP`（`eps = 1e-28`）+ 128-bit 精确 `Fraction` $LDL^T$ 修复下，$(M,K)=(12,12)$（$D=22$，27 个块、272,971 个稀疏矩阵项）干净收敛至 `pdOPT`：全局下界推进至 **`40.556960329409`**（切口 $a_0=-1023/1024$ 为 **`40.556970864736`**），相对 $(10,10)$ 两步合计仅提升 `+0.0014886`，距 $E^*(11)$ 仍余 **`0.039490`** 的本征三点松弛间隙。尤为关键的是 $(12,12)$ 对偶谐波块的奇偶选择定则：$F_0\dots F_8$ 活跃（$\operatorname{tr} F_8 = 0.02057$），**奇阶 $F_9 \approx 3.4\times 10^{-20}$、$F_{11} \approx 5.7\times 10^{-23}$ 严格失活，而偶阶 $F_{10} = 1.05\times 10^{-4}$ 激活**——这与正二十面体对称群 $I_h$ 不变球谐函数的精确度数谱 $\ell \in \{0, 6, 10, 12, \dots\}$（不存在 $\ell = 9, 11$ 不变量）完全吻合，从表示论层面印证了三点伪矩的分数二十面体本质！在 Lean 4 Stage B 工程权衡上，$(12,12)$ 的 $S_2$ SOS 块维度达 $165\times 165$、2D-Kronecker 位宽翻倍至 ~68,000 bits（内核耗时约 $23\times$ 于 $(10,10)$，而下界仅增 `0.0037%` 且同样无法闭合 `0.0395` 间隙），故 Stage A 完整收录并独立校验 $(6,6)\dots(12,12)$ 全部 13 张精确证书，Stage B Lean 4 内核形式化 $(10,10)$ 证书（`40.55547170437074`）。
-
-### 2.2 松弛间隙的第一性原理根因
-
-1. **排除「1D 多项式次数不足」假说**：在真实构型 $X^*_{11}$ 的内积谱上直接求解 1D 次估线性规划 $\max \sum_{i<j} H(t^*_{ij})$ s.t. $H(t) \le \varphi(t)$，在 $M = 8$（$D = 14$）时即达到 `40.596450104`（间隙仅 $4.04 \times 10^{-7}$），比同阶三点 SDP（`40.551494`）小 $10^5$ 倍。（注：若要求在全部 20 个内部轨道上严格零间隙 Hermite 相切，则需 $\deg H \ge 39$ 即 $M \ge 21$，但这只影响 $< 10^{-6}$ 的尾部精度，绝非 $0.040$ 间隙的来源。）
-2. **定位「分数二十面体伪矩测度」**：提取 $(10,10)$ 对偶最优解的一维伪矩序列 $(m_0, \dots, m_{18})$，其 $10\times 10$ Hankel 矩阵正定，对应的 9 节点 Gauss–Christoffel 测度（总质量 $55$ 对）具有清晰的几何指纹：
-   - 在对跖端 $t_1 = -0.999637$ 处放置了 **`3.3946` 对有效点对**（且最优次估多项式在 $t=-1$ 处精确相切：$H^*(-1) = \varphi(-1) = 0.5$，误差 $5\times 10^{-16}$）；
-   - 在 $t_4 = -0.435716 \approx -1/\sqrt{5}$ 处放置 **`18.0106` 对**；
-   - 在 $t_7 = +0.413865, t_8 = +0.481741$（均值 $\approx +1/\sqrt{5}$）处共放置 **`21.8655` 对**。
-   对比 12 顶点正二十面体的内积分布（$-1 \times 6,\; -1/\sqrt{5} \times 30,\; +1/\sqrt{5} \times 30$），三点 SDP 实际上构造了一个**「含 $\approx 3.4$ 对对跖点的 11 点分数二十面体伪构型」**！
-3. **为何 `slab + cap` 分裂无法像 $N = 7, 9$ 那样绕过该障碍**：在真实三维球面 $(S^2)^{11}$ 上，强制包含 $k$ 对精确对跖点 $(x_{2r-1} = -x_{2r})$ 的真实最小库仑能量实测为：
-   - $k = 0$（全局最优 $X^*_{11}$）：`40.59645051`
-   - $k = 1$（1 对精确对跖）：`40.59690735`（仅比全局最优高 **`+0.000457`**！）
-   - $k = 2$（2 对精确对跖）：`40.59767735`（仅比全局最优高 **`+0.001227`**！）
-   - $k = 3$（3 对精确对跖）：`40.62578443`（跃升 **`+0.02933`**）
-   - $k = 4$（4 对精确对跖）：`40.78043465`（跃升 **`+0.18398`**）
-   - $k = 5$（5 对精确对跖，$D_{5d}$ 双五角反棱柱加极点）：`40.90067129`（跃升 **`+0.30422`**）。
-   这揭示了双锁死机制：(a) 因为 $k=1, 2$ 的**真实几何构型**能量仅高出 $4.6\times 10^{-4}$，任何针对 $t \approx -1$ 的单点对条带（$(2,9)$ slab）在原理上都不可能给出高于 `40.59691` 的下界；(b) 而在帽区或窄带内，三点 SDP 只约束 $3\times 3$ 主子阵 $\det G_3 \ge 0$ 与三点球谐核，看不见 $\mathbb{R}^3$ 的**四点秩 3 行列式消失条件 $\det G_4 = 0$**（在 $N=11$ 下阻止第 3、第 4 对对跖点同时嵌入 $S^2$ 而产生 $+0.03\sim+0.18$ 能量惩罚的正是四点及以上的三维刚性受挫）。
+- **80-dps Newton stationary point** (`numerics/bounds/results/phase0_candidate.json`):
+  - $t_1 = 0.327791655942445260192283\ldots$
+  - $t_2 = 0.536744080969946669690331\ldots$
+  - $t_3 = 1.768141527819571963164698\ldots$
+  - $u_4 = 1.029202574133262161829355\ldots$
+  - $v_4 = 0.587901288444605685653989\ldots$
+- **Stationarity & energy:** $\|\nabla_{S^2} E(X^*_{11})\|_\infty = 8.52 \times 10^{-81}$,
+  $$E^*(11) = 40.59645050819060538663553135833447301835336406781920\ldots$$
+  The next lowest local minimum ($C_{5v}$ vertex-removed icosahedron, $1+5+5$) has energy $40.615117336946\ldots$ ($+0.0186668$).
+- **Full $22 \times 22$ Riemannian Hessian spectrum:** 3 $\mathfrak{so}(3)$ rotational zero modes ($\le 1.73 \times 10^{-80}$) and 19 strictly positive eigenvalues with $\lambda_{\min}(H_0) = 0.090673217656229\ldots$ ($\lambda_{\max}(H_0) = 7.6248624744517\ldots$; smallest eigenvalue on the 5D $C_{2v}$ subspace is $0.8103354558\ldots$).
+- **Pairwise inner-product spectrum:** The $\binom{11}{2} = 55$ pairs split into **20 distinct inner-product orbits**:
+  - Minimum inner product $m^* = -0.99902279345944761272\ldots$ (multiplicity 2, disjoint nearly antipodal pairs $(3,6)$ and $(4,5)$, angle $177.467^\circ$); **no exact antipodal pairs**.
+  - Second-smallest level $-0.94331002254210\ldots$ (multiplicity 2); maximum inner product $+0.52190976643867\ldots$ (multiplicity 2).
+  - Minimum adjacent level separation $g_{\min} = 0.00369731146725\ldots$ (between levels 6 and 7: $-0.46891710$ and $-0.46521979$).
+- **Zero-square-root Lean 4 advantage:** Any rational parameters $(t_1, t_2, t_3, u_4, v_4) \in \mathbb{Q}^5$ map to 11 points lying **identically** on $S^2$ as integer projective quadruples $(X_i, Y_i, Z_i, D_i)$ with $X_i^2 + Y_i^2 + Z_i^2 = D_i^2$. Rounding the parameters to denominator $10^9$ perturbs the energy only at second order ($+1.78 \times 10^{-18}$), allowing `StageB.UpperBound.c2vWitness` to certify $E_1(11) \le 2029822525409531 / 50000000000000 = 40.59645050819062$ inside Lean 4 using pure integer arithmetic.
 
 ---
 
-## 3. 已落地的 Lean 4 工程架构（Stage B）
+## 2. Three-Point SDP Tightness Sweep and Intrinsic Obstruction Diagnosis (Phase 0B)
 
-为在保持零外部信任的前提下最大化 Lean 4 内核编译效率，本仓库引入了两项关键工程设计：
+### 2.1 Exact Rational Certificate Summary
 
-1. **零 Mathlib 依赖的纯 `Init` 证书层（`StageB/PolyKronDefs.lean`）**：将多项式求值器、二进制位字典树 `Trie Int` 与 2D-Kronecker 切片校验函数从 `Mathlib` 依赖链中彻底剥离。`SdpCertHarmData.lean`、`SdpCertSosData.lean` 及全部 19 个并行切片模块 `SdpCertSosSlice{M9..9}.lean` **不导入任何 Mathlib 模块**，单进程内存从 `~3.5 GB` 降至 `< 300 MB`，消除了每进程 `225s` 的 `.olean` 加载开销。
-2. **100% 纯整数（`ℤ`）射影上界证明（`StageB/UpperBound.lean`）**：通过有理球极投影生成齐次整数四元组 $(X_i, Y_i, Z_i, D_i)$（满足 $X_i^2 + Y_i^2 + Z_i^2 = D_i^2$）与每对点对倒数距离的整数上界 $u_{ij}$，内核仅需执行 `55` 次 128-bit 整数平方比较与一次整数加法，彻底规避了 `ℚ` 通分最大公约数与 `Finset` 展开开销（编译耗时 `< 15s`）。
+Using the pure-`Fraction` $S_3$-isotypic engine `sym_cap_sdpa.py` (with uncapped harmonic order $K = M$) and the $(2,9)$-typed pole-ring strip engine `sym_strip_sdpa.py`, together with high-precision `SDPA-GMP` solves and exact integer Bareiss Sylvester PD verification, we obtain **15** exact rational certificates (410 PSD blocks, zero identity error):
+
+| Model & Inner-Product Domain | $(M, K)$ | Poly. Deg. $D$ | Certified Lower Bound $e_{\mathrm{cert}}$ | Gap $\Delta = E^*(11) - e_{\mathrm{cert}}$ |
+|---|---:|---:|---:|---:|
+| Global $S_3$, $t \in [-1, 1]$ | $(6, 6)$ | $10$ | `40.533315701817` | `0.06313481` |
+| Global $S_3$, $t \in [-1, 1]$ | $(7, 7)$ | $12$ | `40.545314785703` | `0.05113572` |
+| Global $S_3$, $t \in [-1, 1]$ | $(8, 8)$ | $14$ | `40.551494289332` | `0.04495622` |
+| Global $S_3$, $t \in [-1, 1]$ | $(9, 9)$ | $16$ | `40.554160636831` | `0.04228987` |
+| **Global $S_3$, $t \in [-1, 1]$ (formalized in Lean 4)** | **$(10, 10)$** | **$18$** | **`40.555471704371`** | **`0.04097880`** |
+| **Global $S_3$, $t \in [-1, 1]$ (strongest Stage A cert)** | **$(12, 12)$** | **$22$** | **`40.556960329409`** | **`0.03949018`** |
+| Lower cap cut $S_3$, $t \in [-1023/1024, 1]$ | $(6, 6)$ | $10$ | `40.533320366836` | `0.06313014` |
+| Lower cap cut $S_3$, $t \in [-1023/1024, 1]$ | $(8, 8)$ | $14$ | `40.551516085750` | `0.04493442` |
+| Lower cap cut $S_3$, $t \in [-1023/1024, 1]$ | $(10, 10)$ | $18$ | `40.555539579695` | `0.04091093` |
+| Lower cap cut $S_3$, $t \in [-1023/1024, 1]$ | $(12, 12)$ | $22$ | `40.556970864736` | `0.03947964` |
+| Upper cap cut $S_3$, $t \in [-1, 53/100]$ | $(8, 8)$ | $14$ | `40.551787212256` | `0.04466330` |
+| Deep cap cut $S_3$, $t \in [-49/50, 1]$ | $(8, 8)$ | $14$ | `40.554952399256` | `0.04149811` |
+| Strong cap cut $S_3$, $t \in [-9/10, 1]$ | $(8, 8)$ | $14$ | `40.584934945776` | `0.01151556` (still $< E^*(11)$ despite excluding $X^*_{11}$) |
+| $(2,9)$ typed strip, $t_{01} \in [-1, -1023/1024]$ | $(6, 6)$ | $10$ | `40.536870920686` | `0.05957959` |
+| $(2,9)$ typed narrow strip, $t_{01} \in [-9991/10000, -999/1000]$ | $(7, 7)$ | $12$ | `40.548003495494` | `0.04844701` |
+
+*Harmonic parity selection rule:* At $(M,K)=(12,12)$ (224-bit `SDPA-GMP`, `pdOPT` in $9{,}541.6\,\mathrm{s}$), blocks $F_0, \dots, F_8$ are active ($\operatorname{tr} F_8 = 0.02057$), odd orders $F_9 \approx 3.44 \times 10^{-20}$ and $F_{11} \approx 5.72 \times 10^{-23}$ are strictly inactive, while the even order $F_{10} = 1.05 \times 10^{-4}$ activates---matching the exact spherical-harmonic invariant degrees $\ell \in \{0, 6, 10, 12, \dots\}$ of the icosahedral group $I_h$ (which has no $\ell = 9$ or $\ell = 11$ invariants). Raising $(10,10) \to (12,12)$ adds only $+0.0014886$ (`0.0037%`) while expanding SOS block sizes and kernel Kronecker widths dramatically, so Stage A preserves and verifies the full ladder through $(12,12)$ while Stage B formalizes the clean $(10,10)$ global certificate (`40.55547170437074`).
+
+### 2.2 First-Principles Diagnosis of the $\Delta \approx 0.0395$ Obstruction
+
+1. **Polynomial degree is not the bottleneck:** Solving the discrete-grid 1D minorant LP $\max \sum_{i<j} H(t^*_{ij})$ subject to $2y H(1 - 2y^2) \le 1$ on $20{,}001$ nodes in $y \in [10^{-4}, 1]$ evaluated on the true moments of $X^*_{11}$ yields `40.586405` at $M=4$, `40.596353` at $M=6$, and **`40.59645006` at $M = 8$ ($\deg H = 14$, gap $4.52 \times 10^{-7}$)**---five orders of magnitude tighter than the same-degree three-point SDP (`40.551494`).
+2. **Fractional-icosahedral dual pseudo-measure:** Extracting the optimal $(10,10)$ dual pair pseudo-moments $(\mu_0, \dots, \mu_{18})$ reveals a positive-definite $10 \times 10$ Hankel matrix whose 9-atom Gauss–Christoffel quadrature measure (total mass $55$ pairs) places:
+   - **$3.3946$ effective pairs at $t_1 = -0.999637$** (with exact endpoint tangency $H^*(-1) = \varphi(-1) = 0.5$ to $5 \times 10^{-16}$),
+   - **$18.0106$ effective pairs at $t_4 = -0.435716 \approx -1/\sqrt{5}$**, and
+   - **$21.8655$ effective pairs** split across $t_7 = +0.413865$ ($14.1025$) and $t_8 = +0.481741$ ($7.7630$) around $+1/\sqrt{5}$.
+   Compared with the 12-vertex icosahedron ($-1 \times 6,\; -1/\sqrt{5} \times 30,\; +1/\sqrt{5} \times 30$), the three-point SDP fabricates a **fractional 11-point icosahedral pseudo-configuration** carrying $\approx 3.4$ antipodal pairs.
+3. **Why single-pair slab+cap splitting fails (dual lock-in):** Minimizing the true Coulomb energy on $(S^2)^{11}$ subject to $k$ exact antipodal pairs yields:
+   - $k = 0$: `40.59645051` (unconstrained $X^*_{11}$)
+   - $k = 1$: `40.59690735` ($+0.000457$)
+   - $k = 2$: `40.59767735` ($+0.001227$)
+   - $k = 3$: `40.62578443` ($+0.029334$)
+   - $k = 4$: `40.78043465` ($+0.183984$)
+   - $k = 5$: `40.90067129` ($+0.304221$)
+   Thus (a) true $k=1, 2$ configurations sit only $4.6 \times 10^{-4}$ above $E^*(11)$, preventing single-pair $(2,9)$ slab exclusion near $t = -1$, while (b) three-point SDP enforces only $3\times 3$ Gram positivity ($\det G_3 \ge 0$) and misses the four-point Euclidean realizability identity $\det G_4 = 0$ that enforces the $+0.03\text{--}+0.18$ 3D frustration jump for $k \ge 3$.
 
 ---
 
-## 4. 四点 SDP 层级实测（Phase 0C）与通往 $N = 11$ 完全闭合的下一代路线图
+## 3. Lean 4 Engineering Architecture (Stage B)
 
-为检验低阶四点局部/全局约束能否直接消除三点伪矩，我们在 `numerics/bounds/phase0_4pt_probe.py`（输出 `results/phase0_4pt_probe.json`）中完整实现了 $S_{11} \times O(3)$ 不变四点约束的三大表示论族（每一项均在随机有理球面构型上经精确 `Fraction` 零误差恒等式自测）：
-- **Case 4（4 自由顶点）**：$\det G_4 = 0$ 理想乘子 $q(e)\det G_4(e) = 0$（$\deg q \le D_4 - 4$）+ $\mathbb{Z}_2\times\mathbb{Z}_2$ 块对角化 4 点 Putinar SOS（$1, 1\pm t_{01}$）+ 面行列式 $\det G_3 \ge 0$ SOS；
-- **Case 2（2 自由顶点 + 1 求和邻点）**：Binet–Cauchy 奇宇称叉积块 `Harm4_odd`（$\sum_{i\ne j} s_{ij} s_{ij}^T \succeq 0$）与偶宇称对旗块 `Flag2_even`；
-- **Case 0（0 自由顶点 + 2 求和顶点）**：$(\mathbb{R}^3)^{\otimes d}$（$d = 0 \dots D_4$）全局点对张量块 `GlobNat_d*` 与 `GlobAx_d*`（显式耦合不相交边对 $(i,j),(k,m)$、三边路径 $j\text{--}i\text{--}k\text{--}m$ 及 $\|I_3\|^2 = 3$ 维数收缩）。
+Two engineering innovations keep the kernel verification fast and memory-frugal with zero external trust:
 
-### 4.1 四点 SDP 实测结论
-1. **同阶严格强化定理得到实证**：在相同多项式次数下，四点 SDP 严格击败三点 SDP：
-   - $D_3 = D_4 = 6$（$M = 4$）：三点 `40.32802558` $\to$ 三点+四点 **`40.49109850`**（净增 **`+0.16307292`**）；
-   - $D_3 = D_4 = 8$（$M = 5$）：三点 `40.50635763` $\to$ 三点+四点 **`40.51417969`**（净增 **`+0.00782206`**）。
-2. **低阶四点（$D_4 \le 8$）的多项式分辨率瓶颈**：由于 9 节点分数二十面体伪测度需要至少 $D \ge 14\text{--}18$ 阶多项式才能同时分辨全部支撑原子，低阶四点（$D_4 = 8$ 天花板 `40.51418`，求解已耗时 ~360s）尚低于高阶三点（$M=8\dots 12, D_3=14\dots 22$ 的 `40.55149..40.55696`）；将 $D_4 = 4, 6$ 耦合到 $(M=8, K=8, D_3=14)$ 增益为 **`0.000000000000`**（`< 2e-13`），证明 $(8,8)$ 三点伪测度存在完全满足 $\det G_4 = 0$ 及全部 6 阶四点张量正定性的四点矩延拓。
+1. **Zero-Mathlib pure-`Init` certificate layer (`StageB/PolyKronDefs.lean`):** Polynomial evaluators, the binary bit-trie `Trie Int`, and 2D-Kronecker slice checkers depend solely on Lean's `Init` library. `SdpCertHarmData.lean`, `SdpCertSosData.lean`, and all 19 parallel slice modules `SdpCertSosSlice{M9..9}.lean` import zero Mathlib modules, cutting per-process memory from `~3.5 GB` to `< 300 MB` and eliminating Mathlib `.olean` load latency.
+2. **100% pure-`ℤ` projective upper-bound witness (`StageB/UpperBound.lean`):** Rational stereographic coordinates are stored as integer quadruples $(X_i, Y_i, Z_i, D_i)$ satisfying $X_i^2 + Y_i^2 + Z_i^2 = D_i^2$, and pairwise inverse-distance upper bounds $u_{ij} / S_{\mathrm{inv}}$ ($S_{\mathrm{inv}} = 5 \times 10^{16}$) are checked by 55 pure integer squarings inside `decide +kernel`, avoiding all rational GCD normalization and `Finset` expansion overhead.
 
-### 4.2 下一代完全闭合路线
-1. **高阶稀疏/对称约化四点 SDP（$D_4 \ge 14\text{--}18$ Full $S_4$-Isotypic 4-Point SDP）**：
-   - 将 4 点 SOS 与张量块从 $\mathbb{Z}_2\times\mathbb{Z}_2$ 推进至完整 $S_4$ 不可约表示约化（把 $D_4 = 14\text{--}16$ 的 6 变量矩块压缩 6 倍），使四点多项式次数进入能够分离 9 个二十面体伪原子的高分辨率区（$D_4 \ge 14$）。
-2. **多对联合分支 + 区间 Taylor 分支定界（Multi-Pair Branch-and-Bound + SDP Pruning）**：
-   - 不按单点对 $\min t_{ij}$ 分裂，而按近对跖图 $G_{\le -0.95}$ 的匹配数 $k \in \{0, 1, 2, \ge 3\}$（即 $(2k, 11-2k)$ 多类型 SDP）分裂：$k \ge 3$ 可由多极 typed SDP 直接排除，$k = 1, 2$ 的低维流形邻域（自由度显著降低）配合球面区间算术排除，$k = 0$ 邻域在 $X^*_{11}$ 的 5 维 $C_{2v}$ 隐式驻点（Krawczyk 算子存在唯一性 + $33\times 33$ 整数 Cholesky Hessian 强凸球）内收尾。
+---
+
+## 4. Coupled Four-Point SDP Hierarchy Probe (Phase 0C) and Closure Roadmap
+
+In `numerics/bounds/phase0_4pt_probe.py` (`results/phase0_4pt_probe.json`), we implement all three $S_{11} \times O(3)$-invariant four-point constraint families (every column and block entry verified with exact zero `Fraction` error on a random rational 11-point sphere configuration):
+- **Case 4 (4 free vertices):** ideal multipliers $q(e)\det G_4(e) = 0$ ($\deg q \le D_4 - 4$), $\mathbb{Z}_2 \times \mathbb{Z}_2$-block-diagonalized Putinar SOS on $1, 1 \pm t_{01}$, and $\mathbb{Z}_2$-block-diagonalized face-Gram SOS on $\det G_3(0,1,2) \ge 0$.
+- **Case 2 (2 free vertices + 1 summed neighbor):** Binet–Cauchy cross-product block `Harm4_odd` and pair-flag block `Flag2_even`.
+- **Case 0 (0 free vertices + 2 summed vertices):** global $(\mathbb{R}^3)^{\otimes d}$ pair-tensor blocks `GlobNat_d*` and `GlobAx_d*` coupling disjoint pairs, 3-edge paths, and $I_3$ dimension contractions ($\|I_3\|^2 = 3$).
+
+### 4.1 Probe Findings
+1. **Strict matched-degree strengthening:** Four-point constraints strictly lift same-degree three-point bounds:
+   - $D_3 = D_4 = 6$ ($M = 4$): `40.32802558` $\to$ **`40.49109850`** (**`+0.16307292`**);
+   - $D_3 = D_4 = 8$ ($M = 5$): `40.50635763` $\to$ `40.50651291` at $D_4 = 6$ (`+0.00015528`), and **`40.51417969`** at $D_4 = 8$ (**`+0.00782206`**).
+2. **Low-degree resolution bottleneck ($D_4 \le 8$):** Coupling $D_4 \in \{4, 6\}$ onto high-degree three-point $M = 8$ ($D_3 = 14$, `40.55149429`) yields zero gain (`< 10^{-11}`), showing that the 9-atom pseudo-measure admits a feasible degree-6 four-point moment extension.
+
+### 4.2 Roadmap to Full Closure of $N = 11$
+1. **High-degree full $S_4$-isotypic four-point SDP ($D_4 \ge 14\text{--}18$):** Upgrade four-point SOS and tensor blocks from $\mathbb{Z}_2 \times \mathbb{Z}_2$ to full $S_4$ irreducible representation block-diagonalization (~6x reduction in matrix dimension) so four-point polynomial degree reaches the resolution regime needed to separate the 9 fractional-icosahedral atoms.
+2. **Multi-pair matching branch-and-bound + SDP pruning:** Branch on the matching number $k \in \{0, 1, 2, \ge 3\}$ of the near-antipodal graph $G_{\le -0.95}$ (using $(2k, 11-2k)$-typed SDP for $k \ge 3$, lower-dimensional interval branch-and-bound for $k = 1, 2$, and Krawczyk + $33 \times 33$ integer-Cholesky Riemannian Hessian certification in a neighborhood of $X^*_{11}$).
